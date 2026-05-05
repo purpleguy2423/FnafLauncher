@@ -149,6 +149,7 @@ async function wedone() {
   document.getElementById('selection').style.display = 'none';
   document.title = gametitle;
   document.head.appendChild(script);
+  document.getElementById('save-controls').style.display = 'block';
 }
 
 const originalFetch = window.fetch;
@@ -210,3 +211,45 @@ Promise.all([
     wedone();
 });
 };
+
+function exportSaves() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        data[key] = localStorage.getItem(key);
+    }
+    let jsContent = '// FNAF Launcher Saves Export\n// Generated on ' + new Date().toISOString() + '\n\n';
+    for (const key in data) {
+        const value = data[key].replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+        jsContent += `localStorage.setItem('${key}', '${value}');\n`;
+    }
+    const blob = new Blob([jsContent], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'fnaf_saves.js';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importSaves() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.js';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                // Execute the JS content to set localStorage
+                eval(e.target.result);
+                alert('Saves imported successfully! Reload the game to apply changes.');
+            } catch (err) {
+                alert('Invalid save file or error importing: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}

@@ -140,10 +140,25 @@ document.addEventListener('keydown', function (event) {
     if (inMenu === false && event.keyCode == 39) { if (right === true) { gameSelection('right') } if (right === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } if (currentIndex + 1 > 10) { right = false; } left = true }
     if (inMenu === false && event.keyCode == 40) { if (down === true) { playButtonHover(true); } if (down === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } down = false; up = true }
     if (inMenu === false && event.keyCode == 38) { if (up === true) { playButtonHover(); } if (up === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } up = false; down = true }
-    if (event.keyCode == 13) { if (inMenu === true) { activator(); } if (inMenu === false && hovering === true) { if (launcherSHO === 'steam') { window.open(steamlinks[currentIndex], "_self"); } if (launcherSHO === 'html') { window.open(htmllinks[currentIndex], "_self"); } if (launcherSHO === 'off') { } deactivator() } }
-    if (inMenu === false && event.keyCode == 32) { if (hovering === true) { if (launcherSHO === 'steam') { window.open(steamlinks[currentIndex], "_self"); } if (launcherSHO === 'html') { window.open(htmllinks[currentIndex], "_self"); } if (launcherSHO === 'off') { } deactivator() } }
+    if (event.keyCode == 13) {
+        if (inMenu === true) {
+            activator();
+        } else {
+            openSelectedGame();
+        }
+    }
+    if (inMenu === false && event.keyCode == 32) {
+        openSelectedGame();
+    }
     if (inMenu === false && event.keyCode == 27) { deactivate = true; deactivator(); }
 })
+
+function openSelectedGame() {
+    if (launcherSHO === 'steam') { window.open(steamlinks[currentIndex], "_self"); }
+    if (launcherSHO === 'html') { window.open(htmllinks[currentIndex], "_self"); }
+    if (launcherSHO === 'off') { return; }
+    deactivator();
+}
 
 function gameSelection(direction) {
     if (direction === "left" && currentIndex - 1 > -1) { changeGameSelected(currentIndex - 1); }
@@ -243,5 +258,44 @@ function changeGameSelected(index) {
     if (hovering === true) {
         cardSelector[currentIndex].classList.add('hover');
     }
-    else { hovering = false; }
+function exportSaves() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        data[key] = localStorage.getItem(key);
+    }
+    let jsContent = '// FNAF Launcher Saves Export\n// Generated on ' + new Date().toISOString() + '\n\n';
+    for (const key in data) {
+        const value = data[key].replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+        jsContent += `localStorage.setItem('${key}', '${value}');\n`;
+    }
+    const blob = new Blob([jsContent], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'fnaf_saves.js';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importSaves() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.js';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                // Execute the JS content to set localStorage
+                eval(e.target.result);
+                alert('Saves imported successfully! Reload any open games to apply changes.');
+            } catch (err) {
+                alert('Invalid save file or error importing: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
 }

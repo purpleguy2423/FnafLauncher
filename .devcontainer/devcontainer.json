@@ -1,0 +1,19 @@
+{
+    "name": "FnafLauncher",
+    "image": "mcr.microsoft.com/devcontainers/base:alpine-3.23",
+    "forwardPorts": [8000, 3000],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "streetsidesoftware.code-spell-checker",
+                "esbenp.prettier-vscode"
+            ]
+        }
+    },
+    "remoteUser": "vscode",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "configureZshAsDefaultShell": false
+        }
+    }
+}
