@@ -108,46 +108,61 @@ async function intercept() {
 }
 
 async function extract() {
-  const res = await fetch("resources.zip");
+  try {
+    const res = await fetch("resources.zip");
+    if (!res.ok) throw new Error("Failed to fetch resources.zip: " + res.status);
 
-  const contentLength = res.headers.get("Content-Length");
-  let total = contentLength ? parseInt(contentLength, 10) : 0;
-  let loaded = 0;
-  const chunks = [];
+    const contentLength = res.headers.get("Content-Length");
+    let total = contentLength ? parseInt(contentLength, 10) : 0;
+    let loaded = 0;
+    const chunks = [];
 
-  if (res.body && res.body.getReader) {
-    const reader = res.body.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      loaded += value.length;
-      if (total > 0) {
-        updateProgress('RETURNING GEARS...', Math.floor((loaded / total / 2) * 100));
-      } else {
-        updateProgress('RETURNING GEARS...', 25);
+    if (res.body && res.body.getReader) {
+      const reader = res.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.length;
+        if (total > 0) {
+          updateProgress('RETURNING GEARS...', Math.floor((loaded / total / 2) * 100));
+        } else {
+          updateProgress('RETURNING GEARS...', 25);
+        }
       }
+    } else {
+      const fallbackArrayBuffer = await res.arrayBuffer();
+      chunks.push(new Uint8Array(fallbackArrayBuffer));
+      loaded = fallbackArrayBuffer.byteLength;
+      total = total || loaded;
+      updateProgress('RETURNING GEARS...', 50);
     }
-  } else {
-    const fallbackArrayBuffer = await res.arrayBuffer();
-    chunks.push(new Uint8Array(fallbackArrayBuffer));
-    loaded = fallbackArrayBuffer.byteLength;
-    total = total || loaded;
-    updateProgress('RETURNING GEARS...', 50);
-  }
 
-  const zipArrayBuffer = await new Blob(chunks).arrayBuffer();
-  updateProgress('UNPACKING ARCHIVE...', 50);
-  const zip = await JSZip.loadAsync(zipArrayBuffer);
-  const files = Object.keys(zip.files).filter(name => !zip.files[name].dir);
-  const totalFiles = files.length;
+    const zipArrayBuffer = await new Blob(chunks).arrayBuffer();
+    updateProgress('UNPACKING ARCHIVE...', 50);
+    console.log('ZIP file size:', zipArrayBuffer.byteLength, 'bytes');
+    
+    if (!window.JSZip) throw new Error("JSZip library not loaded");
+    const zip = await JSZip.loadAsync(zipArrayBuffer);
+    console.log('ZIP loaded successfully');
+    
+    const files = Object.keys(zip.files).filter(name => !zip.files[name].dir);
+    const totalFiles = files.length;
+    console.log('Total files to extract:', totalFiles);
 
-  for (let i = 0; i < totalFiles; i++) {
-    const file = zip.files[files[i]];
-    const blob = await file.async("blob");
-    const url = URL.createObjectURL(blob);
-    map.set(files[i], url);
-    updateProgress('BOOTING UP ARCHIVE...', Math.floor(((i + 1) / totalFiles / 2) * 100 + 50));
+    for (let i = 0; i < totalFiles; i++) {
+      const file = zip.files[files[i]];
+      const blob = await file.async("blob");
+      const url = URL.createObjectURL(blob);
+      map.set(files[i], url);
+      const progress = Math.floor(((i + 1) / totalFiles / 2) * 100 + 50);
+      updateProgress('BOOTING UP ARCHIVE...', progress);
+      console.log('Extracted file ' + (i + 1) + '/' + totalFiles);
+    }
+  } catch (error) {
+    console.error('Extract error:', error);
+    updateProgress('ERROR DURING EXTRACTION: ' + error.message, 100);
+    throw error;
   }
 }
 
