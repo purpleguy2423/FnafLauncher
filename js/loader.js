@@ -33,19 +33,23 @@ function preventMotion(event)
     event.stopPropagation();
 }
 
-// Fullscreen Key
+// Fullscreen Key (only intercept for fullscreen combo, let other keys pass through)
 const pressedKeys = {};
 document.addEventListener('keydown', event => {
   pressedKeys[event.key] = true;
   if (pressedKeys['-'] && pressedKeys['=']) {
-    document.querySelector('canvas').requestFullscreen();
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      canvas.requestFullscreen().catch(() => {});
+      event.preventDefault();
+    }
     delete pressedKeys[event.key];
   }
-});
+}, true); // Use capture phase to ensure canvas gets events
 
 document.addEventListener('keyup', (event) => {
   delete pressedKeys[event.key];
-});
+}, true);
 
 // -----------------
 function launch() {
@@ -107,21 +111,34 @@ async function extract() {
   const res = await fetch("resources.zip");
 
   const contentLength = res.headers.get("Content-Length");
-  const total = parseInt(contentLength, 10);
-  const reader = res.body.getReader();
+  let total = contentLength ? parseInt(contentLength, 10) : 0;
   let loaded = 0;
   const chunks = [];
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    loaded += value.length;
-    updateProgress('RETURNING GEARS...', Math.floor((loaded / total / 2) * 100));
+  if (res.body && res.body.getReader) {
+    const reader = res.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      loaded += value.length;
+      if (total > 0) {
+        updateProgress('RETURNING GEARS...', Math.floor((loaded / total / 2) * 100));
+      } else {
+        updateProgress('RETURNING GEARS...', 25);
+      }
+    }
+  } else {
+    const fallbackArrayBuffer = await res.arrayBuffer();
+    chunks.push(new Uint8Array(fallbackArrayBuffer));
+    loaded = fallbackArrayBuffer.byteLength;
+    total = total || loaded;
+    updateProgress('RETURNING GEARS...', 50);
   }
 
-  const arrayBuffer = await new Blob(chunks).arrayBuffer();
-  const zip = await JSZip.loadAsync(arrayBuffer);
+  const zipArrayBuffer = await new Blob(chunks).arrayBuffer();
+  updateProgress('UNPACKING ARCHIVE...', 50);
+  const zip = await JSZip.loadAsync(zipArrayBuffer);
   const files = Object.keys(zip.files).filter(name => !zip.files[name].dir);
   const totalFiles = files.length;
 
@@ -143,13 +160,22 @@ async function wedone() {
   script.onload = () => {
     new Runtime("MMFCanvas", runtimecanvas);
   };
-  document.getElementById('MMFCanvas').style.display = 'block';
-  document.getElementById('MMFCanvas').width = canvaswidth;
-  document.getElementById('MMFCanvas').height = canvasheight;
+  
+  const canvas = document.getElementById('MMFCanvas');
+  canvas.style.display = 'block';
+  canvas.width = canvaswidth;
+  canvas.height = canvasheight;
+  canvas.tabIndex = 0;
+  canvas.focus();
+  
   document.getElementById('selection').style.display = 'none';
   document.title = gametitle;
   document.head.appendChild(script);
   document.getElementById('save-controls').style.display = 'block';
+  
+  // Ensure canvas stays focused and receives key events
+  window.addEventListener('focus', () => canvas.focus());
+  document.addEventListener('click', () => canvas.focus());
 }
 
 const originalFetch = window.fetch;
@@ -161,9 +187,10 @@ function mergeFiles(fileParts) {
       let loadedSize = 0;
       Promise.all(fileParts.map(part =>
           fetch(part, { method: 'HEAD' }).then(res => {
-            try { if (!res.ok) throw new Error("Missing part: " + part);
-              return parseInt(res.headers.get("Content-Length") || "0", 10);
-            } catch (error) {document.getElementById('stage').innerHTML = "ERROR: MISSING FILE(S)..."}
+            if (!res.ok) {
+              throw new Error("Missing part: " + part);
+            }
+            return parseInt(res.headers.get("Content-Length") || "0", 10);
           })
       )).then(sizes => {
           totalSize = sizes.reduce((a, b) => a + b, 0);
@@ -202,13 +229,16 @@ Promise.all([
     mergeFiles(getParts("assets/gamefiles/" + gamedetail + "/resources.zip", 1, parts))
 ]).then(([resources]) => {
     window.fetch = async function (url, ...args) {
-        if (url.endsWith("resources.zip")) {
+        if (typeof url === 'string' && url.endsWith("resources.zip")) {
             return originalFetch(resources, ...args);
         } else {
             return originalFetch(url, ...args);
         }
     };
     wedone();
+}).catch(error => {
+    console.error(error);
+    document.getElementById('stage').innerText = 'ERROR: ' + error.message;
 });
 };
 

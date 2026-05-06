@@ -30,8 +30,10 @@ fetch("assets/jsons/games.json").then((response) => response.json()).then((data)
         cardtitle.src = gameimages + "title.png";
 
         const playdiv = document.createElement("a");
-        playdiv.addEventListener("click", () => {
-            deactivator();
+        playdiv.href = "javascript:void(0)";
+        playdiv.addEventListener("click", (event) => {
+            event.stopPropagation();
+            openSelectedGame(tile);
         });
         const playbutton = document.createElement("button");
         playbutton.className = "play-button";
@@ -100,8 +102,8 @@ if (playSound === 'false') { soundIcon.src = 'assets/images/icons/sound-off.svg'
 
 function activator() {
     if (playSound === 'true') { back.currentTime = 0; back.play(); }
-    menu.style.display = "none";
-    selection.style.display = "flex";
+    if (menu) menu.style.display = "none";
+    if (selection) selection.style.display = "flex";
     inMenu = false;
     cardSelector = document.querySelectorAll('.game-card');
     cardSelectorSource = document.querySelectorAll('.game-card a');
@@ -136,27 +138,35 @@ function deactivator() {
 }
 
 document.addEventListener('keydown', function (event) {
-    if (inMenu === false && event.keyCode == 37) { if (left === true) { gameSelection('left') } if (left === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } if (currentIndex - 1 < 0) { left = false; } right = true }
-    if (inMenu === false && event.keyCode == 39) { if (right === true) { gameSelection('right') } if (right === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } if (currentIndex + 1 > 10) { right = false; } left = true }
-    if (inMenu === false && event.keyCode == 40) { if (down === true) { playButtonHover(true); } if (down === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } down = false; up = true }
-    if (inMenu === false && event.keyCode == 38) { if (up === true) { playButtonHover(); } if (up === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } up = false; down = true }
-    if (event.keyCode == 13) {
+    // Enter key handling - must be first to ensure it runs
+    if (event.keyCode === 13 || event.key === 'Enter') {
+        event.preventDefault();
         if (inMenu === true) {
             activator();
         } else {
             openSelectedGame();
         }
+        return;
     }
-    if (inMenu === false && event.keyCode == 32) {
+    
+    if (inMenu === false && event.keyCode == 37) { if (left === true) { gameSelection('left') } if (left === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } if (currentIndex - 1 < 0) { left = false; } right = true }
+    if (inMenu === false && event.keyCode == 39) { if (right === true) { gameSelection('right') } if (right === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } if (currentIndex + 1 > 10) { right = false; } left = true }
+    if (inMenu === false && event.keyCode == 40) { if (down === true) { playButtonHover(true); } if (down === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } down = false; up = true }
+    if (inMenu === false && event.keyCode == 38) { if (up === true) { playButtonHover(); } if (up === false) { if (playSound === 'true') { error.currentTime = 0; error.play(); } } up = false; down = true }
+    if (inMenu === false && (event.keyCode == 32 || event.key === ' ')) {
         openSelectedGame();
     }
     if (inMenu === false && event.keyCode == 27) { deactivate = true; deactivator(); }
 })
 
-function openSelectedGame() {
-    if (launcherSHO === 'steam') { window.open(steamlinks[currentIndex], "_self"); }
-    if (launcherSHO === 'html') { window.open(htmllinks[currentIndex], "_self"); }
-    if (launcherSHO === 'off') { return; }
+function openSelectedGame(index = currentIndex) {
+    if (launcherSHO === 'steam') {
+        window.open(steamlinks[index], "_self");
+    } else if (launcherSHO === 'html') {
+        window.open(htmllinks[index], "_self");
+    } else {
+        return;
+    }
     deactivator();
 }
 
@@ -258,6 +268,8 @@ function changeGameSelected(index) {
     if (hovering === true) {
         cardSelector[currentIndex].classList.add('hover');
     }
+}
+
 function exportSaves() {
     const data = {};
     for (let i = 0; i < localStorage.length; i++) {

@@ -50,7 +50,7 @@
         "cch": "fnafw.cch",
         "color": "linear-gradient(to top, rgba(8, 85, 15, 0.8) 0%, transparent 40%)",
         "links": [
-            "javascript:alert('Sorry! We have not added a way to launch FNAF World yet...')",
+            "loader.html?game=5",
             "loader.html?game=5"
         ]
     },
